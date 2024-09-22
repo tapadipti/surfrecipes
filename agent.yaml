@@ -1,0 +1,32 @@
+
+api_version: v1
+kind: TaskAgent
+name: "RecipeFinder"
+description: "An AI agent that understands your requirements and finds suitable recipes"
+cmd: "poetry run python -m recipefinder.server"
+img_repo: ""
+tags:
+  - "gui"
+supports:
+  - "desktop"
+versions:
+  latest: ":latest"
+runtimes:
+  - type: "agent"
+    preference:
+      - "process"
+      - "docker"
+      - "kube"
+llm_providers:
+  preference:
+    - "gpt-4o"
+    - "gpt-4-turbo"
+    - "anthropic/claude-3-opus-20240229"
+public: True
+icon: https://tinyurl.com/y5u4u7te
+resource_requests:
+  cpu: "1"
+  memory: "2Gi"
+resource_limits:
+  cpu: "2"
+  memory: "4Gi"
