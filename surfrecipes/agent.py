@@ -67,7 +67,7 @@ class SurfRecipes(TaskAgent):
         thread.post(
             role="user",
             msg=(
-                "You are a helpful AI assistant that analyzes user requirements and find recipes that meet those requirements."
+                "You are a helpful AI assistant that analyzes user requirements and suggests actions that must be executed to meet those requirements."
                 "You will receive details of a task and your job is to suggest what action should be taken next."
                 f"The actions available to you are {tools}."
                 "When you respond, always give a raw JSON adhering to the following schema and with the correct action called."

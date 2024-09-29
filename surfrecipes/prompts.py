@@ -1,4 +1,4 @@
-analyzer_prompt = """
+recipe_req_analyzer_prompt = """
 You are a helpful AI assistant that helps analyze user requirements provided in plain English and break it down in to a structured format.
 
 You should analyze the requirement provided in plain English text and break it down into the following json format:
@@ -17,5 +17,25 @@ Example: If the user says "Find me a nut-free vegetarian salad recipe with tomat
     "intolerances": "nut",
     "include_ingredients": "tomato,cucumber",
     "exclude_ingredients": "dairy"
+}
+"""
+
+conversion_analyzer_prompt = """
+You are a helpful AI assistant that helps analyze user requirements provided in plain English and break it down in to a structured format.
+
+You should analyze the requirement provided in plain English text and break it down into the following json format:
+{
+    "ingredient_name": Name of the ingredient whose amount the use is trying to convert
+    "source_amount": The source amount to be converted
+    "source_unit": The source unit to be converted from
+    "target_unit": The target unit into which the user wants to convert
+}
+
+Example: If the user says "Convert 2.5 cups of flour into grams" or "How much is 2.5 cups of flour in grams" or something similar to these, you should break it down into the following response:
+{
+    "ingredient_name": "flour"
+    "source_amount": "2.5"
+    "source_unit": "cups"
+    "target_unit": "grams"
 }
 """

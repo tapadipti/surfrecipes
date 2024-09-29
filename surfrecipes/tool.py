@@ -14,7 +14,7 @@ from rich.console import Console
 from taskara import Task
 from toolfuse import Tool, action, observation
 
-from .prompt_to_analyze_req import analyzer_prompt
+from .prompts import recipe_req_analyzer_prompt, conversion_analyzer_prompt
 
 router = Router.from_env()
 console = Console()
@@ -28,13 +28,13 @@ if not SPOONACULAR_API_KEY:
     raise
 
 class SurfRecipesTool(Tool):
-    """A semantic desktop replaces click actions with semantic description rather than coordinates"""
+    """A recipe surfer tool that finds recipes and does other tasks related to recipes."""
 
     def __init__(
         self, task: Task, data_path: str = "./.data"
     ) -> None:
         """
-        Initialize and open a URL in the application.
+        Initialize the tool.
 
         Args:
             task: Agent task. Defaults to None.
@@ -49,14 +49,14 @@ class SurfRecipesTool(Tool):
         self.task = task
 
     @observation
-    def get_requirements(self, requirements: str) -> Dict[str, Union[str, List[str]]]:
+    def get_recipe_requirements(self, requirements: str) -> Dict[str, Union[str, List[str]]]:
         """
-        This is the first step in solving a recipe finder task. It takes a text describing what the user wants and returns a structured breakdown of user requirements. The structured breakdown clarifies the food, diet, intolerances, include_ingredients and exclude_ingredients that the user wants in the recipe. This breakdown can then be used to search for suitable recipes.
+        This is the first step in finding a recipe. It takes a text describing what type of recipe the user wants and returns a structured breakdown of user requirements. The structured breakdown clarifies the food, diet, intolerances, include_ingredients and exclude_ingredients that the user wants in the recipe. This breakdown can then be used to search for suitable recipes.
         """
         thread = RoleThread()
         router = Router(preference=["gpt-4-turbo"])
 
-        analyzer_msg = f"{analyzer_prompt} Here is the user requirement in plain English: {requirements}"
+        analyzer_msg = f"{recipe_req_analyzer_prompt} Here is the user requirement in plain English: {requirements}"
         thread.post(role="user", msg=analyzer_msg)
 
         response = router.chat(thread)
@@ -125,3 +125,41 @@ class SurfRecipesTool(Tool):
         img = Image.open(img_content.raw)
         img.show()
         return "Task Complete"
+
+    @observation
+    def get_conversion_requirements(self, requirements: str) -> Dict[str, Union[str, List[str]]]:
+        """
+        Transforms the user request to covert ingredients from one unit to another from a plain English format to a structured format. It takes a text describing what the uer is trying to convert and returns a structured breakdown that clarifies the ingredient name, source amount, source unit and target unit for conversion. These details can then be used to perform the conversion.
+        """
+        thread = RoleThread()
+        router = Router(preference=["gpt-4-turbo"])
+
+        analyzer_msg = f"{conversion_analyzer_prompt} Here is the conversion requirement in plain English: {requirements}"
+        thread.post(role="user", msg=analyzer_msg)
+
+        response = router.chat(thread)
+        requirements_breakdown = json.loads(response.msg.text)
+
+        return {
+            "ingredient_name": requirements_breakdown["ingredient_name"],
+            "source_amount": requirements_breakdown["source_amount"],
+            "source_unit": requirements_breakdown["source_unit"],
+            "target_unit": requirements_breakdown["target_unit"],
+        }
+
+    @action
+    def convert_ingredient_amounts(self, requirements_breakdown: Dict[str, str]) -> None:
+        """Converts ingredients from one unit to another. It needs the conversion request to be in a structured format. Then, it can perform the conversion."""
+        params = {'apiKey': SPOONACULAR_API_KEY, 'number': 1}
+        params['ingredientName'] = requirements_breakdown['ingredient_name']
+        params['sourceAmount'] = requirements_breakdown['source_amount']
+        params['sourceUnit'] = requirements_breakdown['source_unit']
+        params['targetUnit'] = requirements_breakdown['target_unit']
+
+        convert_amount_api_url = "https://api.spoonacular.com/recipes/convert"
+        response = requests.get(convert_amount_api_url, params=params)
+        if response.status_code != 200:
+            raise Exception("Error converting amounts on Spoonacular")
+        conversion = json.loads(response.text)
+        conversion_answer = conversion['answer']
+        return conversion_answer
