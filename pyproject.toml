@@ -1,12 +1,12 @@
 
 [tool.poetry]
-name = "SurfSlicer"
+name = "SurfRecipes"
 version = "0.1.0"
-description = "AI agent for A GUI surfer which uses coordinate dots for grounding"
-authors = ["Patrick Barker <patrickbarkerco@gmail.com>"]
+description = "AI agent for An AI agent that understands your requirements and finds suitable recipes"
+authors = ["Tapa Dipti Sitaula <tapadipti@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "surfslicer"}]
+packages = [{include = "surfrecipes"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"

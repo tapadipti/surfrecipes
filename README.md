@@ -1,27 +1,11 @@
-<!-- PROJECT LOGO -->
-<br />
 <p align="center">
-  <!-- <a href="https://github.com/agentsea/skillpacks">
-    <img src="https://project-logo.png" alt="Logo" width="80">
-  </a> -->
 
-  <h1 align="center">SurfSlicer</h1>
+  <h1 align="center">SurfRecipes</h1>
     <p align="center">
-    <img src="logo/SurfSlicer-512x512.jpg" alt="SurfSlicer Logo" width="200" style="border-radius: 20px;">
+    <img src="logo/SurfSlicer-512x512.jpg" alt="SurfRecipes Logo" width="200" style="border-radius: 20px;">
     </p>
   <p align="center">
-    A GUI surfer which zooms in and slices. A lot.
-    <br />
-    <a href="https://docs.hub.agentsea.ai/introduction"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/agentsea/surfslicer">View Demo</a>
-    ·
-    <a href="https://github.com/agentsea/surfslicer/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/agentsea/surfslicer/issues">Request Feature</a>
-  </p>
-  <br>
+    An AI agent that understands your requirements and finds suitable recipes.
 </p>
 
 ## Install
@@ -32,61 +16,45 @@ pip install surfkit
 
 ## Quick Start
 
+Set the 
+
+```sh
+export SPOONACULAR_API_KEY=<Provide your SPOONACULAR API KEY here>
+```
+If you have not created an account in Spoonacular, visit https://spoonacular.com/food-api to create and account and get your API key.
+
 Create a tracker
 
 ```sh
-surfkit create tracker
+surfkit create tracker -n trk101 -r docker
 ```
 
 Create a device
 
 ```sh
-surfkit create device --provider gce --name device01
+surfkit create device -n dev101 -p qemu
 ```
 
 Create the agent
 
 ```sh
-surfkit create agent -t mariyadavydova/SurfSlicer --name agent01
+surfkit create agent -n ag101 -r process --local-keys
 ```
 
 Solve a task
 
 ```sh
-surfkit solve "Search for common varieties of french ducks" \
-  --device device01 \
-  --agent agent01
+surfkit solve "Find me a gluten-free vegetarian salad recipe with tomato and carrots and without any eggs." --agent ag101 --device dev101 --tracker trk101
 ```
 
-## Documentation
-
-See our [docs](https://docs.hub.agentsea.ai) for more information on how to use SurfSlicer.
-
-## Developing
-
-Install dependencies
-
+Get the agent logs
 ```sh
-poetry install
+surfkit logs --name ag101
 ```
 
-Create a tracker
-
+Delete the agent
 ```sh
-surfkit create tracker
-```
-
-Create a device
-
-```sh
-surfkit create device --provider gce --name george
-```
-
-Solve a task
-
-```sh
-surfkit solve "Search for common varieties of french ducks" \
---device george --agent-file ./agent.yaml --runtime process
+surfkit delete agent --name ag101
 ```
 
 ## Community

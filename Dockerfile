@@ -10,4 +10,4 @@ RUN poetry install
 EXPOSE 9090
 
 # Run the application
-CMD ["poetry", "run", "python", "-m", "surfslicer.server"]
+CMD ["poetry", "run", "python", "-m", "surfrecipes.server"]

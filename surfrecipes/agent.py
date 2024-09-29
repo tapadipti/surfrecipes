@@ -16,7 +16,8 @@ from tenacity import before_sleep_log, retry, stop_after_attempt
 from threadmem import RoleMessage, RoleThread
 from toolfuse.util import AgentUtils
 
-from .tool import SemanticDesktop, router
+from .tool import SurfRecipesTool, router
+from .prompt_to_return_action import action_finder_prompt
 
 logging.basicConfig(level=logging.INFO)
 logger: Final = logging.getLogger(__name__)
@@ -25,12 +26,12 @@ logger.setLevel(int(os.getenv("LOG_LEVEL", str(logging.DEBUG))))
 console = Console(force_terminal=True)
 
 
-class SurfSlicerConfig(BaseModel):
+class SurfRecipesConfig(BaseModel):
     pass
 
 
-class SurfSlicer(TaskAgent):
-    """A GUI desktop agent that slices up the image"""
+class SurfRecipes(TaskAgent):
+    """An AI agent that finds recipes"""
 
     def solve_task(
         self,
@@ -57,42 +58,44 @@ class SurfSlicer(TaskAgent):
         task.ensure_thread("debug")
         task.post_message("assistant", f"I'll post debug messages here", thread="debug")
 
-        # Check that the device we received is one we support
-        if not isinstance(device, Desktop):
-            raise ValueError("Only desktop devices supported")
+        # # Check that the device we received is one we support
+        # if not isinstance(device, Desktop):
+        #     raise ValueError("Only desktop devices supported")
 
-        # Wrap the standard desktop in our special tool
-        semdesk = SemanticDesktop(task=task, desktop=device)
+        # # Wrap the standard desktop in our special tool
+        # semdesk = SemanticDesktop(task=task, desktop=device)
+        recipetool = SurfRecipesTool(task=task, desktop=device)
 
-        # Add standard agent utils to the device
-        semdesk.merge(AgentUtils())
+        # # Add standard agent utils to the device
+        # semdesk.merge(AgentUtils())
 
-        # Open a site if present in the parameters
-        site = task._parameters.get("site") if task._parameters else None
-        if site:
-            console.print(f"▶️ opening site url: {site}", style="blue")
-            task.post_message("assistant", f"opening site url {site}...")
-            semdesk.desktop.open_url(site)
-            console.print("waiting for browser to open...", style="blue")
-            time.sleep(5)
+        # # Open a site if present in the parameters
+        # site = task._parameters.get("site") if task._parameters else None
+        # if site:
+        #     console.print(f"▶️ opening site url: {site}", style="blue")
+        #     task.post_message("assistant", f"opening site url {site}...")
+        #     semdesk.desktop.open_url(site)
+        #     console.print("waiting for browser to open...", style="blue")
+        #     time.sleep(5)
 
-        # Get info about the desktop
-        info = semdesk.desktop.info()
-        screen_size = info["screen_size"]
-        console.print(f"Screen size: {screen_size}")
+        # # Get info about the desktop
+        # info = semdesk.desktop.info()
+        # screen_size = info["screen_size"]
+        # console.print(f"Screen size: {screen_size}")
 
         # Get the json schema for the tools, excluding actions that aren't useful
-        tools = semdesk.json_schema(
-            exclude_names=[
-                "move_mouse",
-                "click",
-                "drag_mouse",
-                "mouse_coordinates",
-                "take_screenshot",
-                "open_url",
-                "double_click",
-            ]
-        )
+        # tools = semdesk.json_schema(
+        #     exclude_names=[
+        #         "move_mouse",
+        #         "click",
+        #         "drag_mouse",
+        #         "mouse_coordinates",
+        #         "take_screenshot",
+        #         "open_url",
+        #         "double_click",
+        #     ]
+        # )
+        tools = recipetool.json_schema()
         console.print("tools: ", style="purple")
         console.print(JSON.from_data(tools))
 
@@ -101,23 +104,21 @@ class SurfSlicer(TaskAgent):
         thread.post(
             role="user",
             msg=(
-                "You are an AI assistant which uses devices to accomplish tasks. "
-                f"Your current task is {task.description}, and your available tools are {tools} "
-                "For each screenshot I will send you please return the result chosen action as a "
-                f"raw JSON adhearing to the schema {V1ActionSelection.model_json_schema()} "
-                "Let me know when you are ready and I'll send you the first screenshot. "
+                f"{action_finder_prompt} "
+                f"Your current task is {task.description}, and your available tools are {tools}. "
             ),
         )
         response = router.chat(thread, namespace="system")
         console.print(f"system prompt response: {response}", style="blue")
         thread.add_msg(response.msg)
+        current_state = response.msg
 
         # Loop to run actions
         for i in range(max_steps):
             console.print(f"-------step {i + 1}", style="green")
 
             try:
-                thread, done = self.take_action(semdesk, task, thread)
+                thread, current_state, done = self.take_action(recipetool, task, thread, current_state)
             except Exception as e:
                 console.print(f"Error: {e}", style="red")
                 task.status = TaskStatus.FAILED
@@ -145,14 +146,15 @@ class SurfSlicer(TaskAgent):
     )
     def take_action(
         self,
-        semdesk: SemanticDesktop,
+        recipetool: SurfRecipesTool,
         task: Task,
         thread: RoleThread,
-    ) -> Tuple[RoleThread, bool]:
+        current_state: dict,
+    ) -> Tuple[RoleThread, dict, bool]:
         """Take an action
 
         Args:
-            desktop (SemanticDesktop): Desktop to use
+            recipetool (SurfRecipesTool): Surf recipes tool
             task (str): Task to accomplish
             thread (RoleThread): Role thread for the task
 
@@ -163,7 +165,7 @@ class SurfSlicer(TaskAgent):
             # Check to see if the task has been cancelled
             if task.remote:
                 task.refresh()
-            console.print("task status: ", task.status.value)
+                console.print("task status: ", task.status.value)
             if (
                 task.status == TaskStatus.CANCELING
                 or task.status == TaskStatus.CANCELED
@@ -180,32 +182,26 @@ class SurfSlicer(TaskAgent):
             _thread = thread.copy()
             _thread.remove_images()
 
-            # Take a screenshot of the desktop and post a message with it
-            screenshot_b64 = semdesk.desktop.take_screenshot()
-            task.post_message(
-                "assistant",
-                "current image",
-                images=[f"data:image/png;base64,{screenshot_b64}"],
-                thread="debug",
-            )
+            # # Take a screenshot of the desktop and post a message with it
+            # screenshot_b64 = semdesk.desktop.take_screenshot()
+            # task.post_message(
+            #     "assistant",
+            #     "current image",
+            #     images=[f"data:image/png;base64,{screenshot_b64}"],
+            #     thread="debug",
+            # )
 
-            # Get the current mouse coordinates
-            x, y = semdesk.desktop.mouse_coordinates()
-            console.print(f"mouse coordinates: ({x}, {y})", style="white")
+            # # Get the current mouse coordinates
+            # x, y = semdesk.desktop.mouse_coordinates()
+            # console.print(f"mouse coordinates: ({x}, {y})", style="white")
 
             # Craft the message asking the MLLM for an action
             msg = RoleMessage(
                 role="user",
                 text=(
-                    "Here is a screenshot of the current desktop, please select an action from the provided schema."
-                    "Carefully analyze the screenshot and select an action. Watch out for elements that "
-                    "are different from others, for example, have the border of the different color. "
-                    "Such elements are usually already in focus, and you can try to type text in them right away. "
-                    "However, if you tried to type on a previous step and want to type the same input again, you better "
-                    "focus on the input field first by clicking on it. "
-                    "Please return just the raw JSON."
+                    f"{action_finder_prompt} "
+                    f"Your current task is {current_state}, and your available tools are {recipetool.json_schema()}. "
                 ),
-                images=[f"data:image/png;base64,{screenshot_b64}"],
             )
             _thread.add_msg(msg)
 
@@ -213,7 +209,7 @@ class SurfSlicer(TaskAgent):
             response = router.chat(
                 _thread,
                 namespace="action",
-                expect=V1ActionSelection,
+                # expect=V1ActionSelection,
                 agent_id=self.name(),
             )
             task.add_prompt(response.prompt)
@@ -251,7 +247,7 @@ class SurfSlicer(TaskAgent):
                 return _thread, True
 
             # Find the selected action in the tool
-            action = semdesk.find_action(selection.action.name)
+            action = recipetool.find_action(selection.action.name)
             console.print(f"found action: {action}", style="blue")
             if not action:
                 console.print(f"action returned not found: {selection.action.name}")
@@ -259,7 +255,7 @@ class SurfSlicer(TaskAgent):
 
             # Take the selected action
             try:
-                action_response = semdesk.use(action, **selection.action.parameters)
+                action_response = recipetool.use(action, **selection.action.parameters)
             except Exception as e:
                 raise ValueError(f"Trouble using action: {e}")
 
@@ -273,7 +269,7 @@ class SurfSlicer(TaskAgent):
             task.record_action(
                 prompt=response.prompt,
                 action=selection.action,
-                tool=semdesk.ref(),
+                tool=recipetool.ref(),
                 result=action_response,
                 agent_id=self.name(),
                 model=response.model,
@@ -298,34 +294,34 @@ class SurfSlicer(TaskAgent):
         return [Desktop]
 
     @classmethod
-    def config_type(cls) -> Type[SurfSlicerConfig]:
+    def config_type(cls) -> Type[SurfRecipesConfig]:
         """Type of config
 
         Returns:
             Type[DinoConfig]: Config type
         """
-        return SurfSlicerConfig
+        return SurfRecipesConfig
 
     @classmethod
-    def from_config(cls, config: SurfSlicerConfig) -> "SurfSlicer":
+    def from_config(cls, config: SurfRecipesConfig) -> "SurfRecipes":
         """Create an agent from a config
 
         Args:
             config (DinoConfig): Agent config
 
         Returns:
-            SurfSlicer: The agent
+            SurfRecipes: The agent
         """
-        return SurfSlicer()
+        return SurfRecipes()
 
     @classmethod
-    def default(cls) -> "SurfSlicer":
+    def default(cls) -> "SurfRecipes":
         """Create a default agent
 
         Returns:
-            SurfSlicer: The agent
+            SurfRecipes: The agent
         """
-        return SurfSlicer()
+        return SurfRecipes()
 
     @classmethod
     def init(cls) -> None:
@@ -333,4 +329,4 @@ class SurfSlicer(TaskAgent):
         return
 
 
-Agent = SurfSlicer
+Agent = SurfRecipes
