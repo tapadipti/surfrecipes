@@ -14,7 +14,9 @@ from rich.console import Console
 from taskara import Task
 from toolfuse import Tool, action, observation
 
-from .prompts import recipe_req_analyzer_prompt, conversion_analyzer_prompt
+from .prompts import recipe_req_analyzer_prompt, \
+                        conversion_analyzer_prompt, \
+                        substitution_analyzer_prompt
 
 router = Router.from_env()
 console = Console()
@@ -150,7 +152,7 @@ class SurfRecipesTool(Tool):
     @action
     def convert_ingredient_amounts(self, requirements_breakdown: Dict[str, str]) -> None:
         """Converts ingredients from one unit to another. It needs the conversion request to be in a structured format. Then, it can perform the conversion."""
-        params = {'apiKey': SPOONACULAR_API_KEY, 'number': 1}
+        params = {'apiKey': SPOONACULAR_API_KEY}
         params['ingredientName'] = requirements_breakdown['ingredient_name']
         params['sourceAmount'] = requirements_breakdown['source_amount']
         params['sourceUnit'] = requirements_breakdown['source_unit']
@@ -162,4 +164,40 @@ class SurfRecipesTool(Tool):
             raise Exception("Error converting amounts on Spoonacular")
         conversion = json.loads(response.text)
         conversion_answer = conversion['answer']
+        return conversion_answer
+
+    @observation
+    def get_substitute_requirements(self, requirements: str) -> Dict[str, Union[str, List[str]]]:
+        """
+        Transforms the user request to find ingredient substitutes from a plain English format to a structured format. It takes a text describing what the uer is trying to substitute and returns a structured breakdown that clarifies the ingredient name, which can then be used to search for substitutes.
+        """
+        thread = RoleThread()
+        router = Router(preference=["gpt-4-turbo"])
+
+        analyzer_msg = f"{substitution_analyzer_prompt} Here is the substitution requirement in plain English: {requirements}"
+        thread.post(role="user", msg=analyzer_msg)
+
+        response = router.chat(thread)
+        requirements_breakdown = json.loads(response.msg.text)
+
+        return {
+            "ingredient_name": requirements_breakdown["ingredient_name"],
+        }
+
+    @action
+    def convert_ingredient_amounts(self, requirements_breakdown: Dict[str, str]) -> None:
+        """Find substitutes for a given ingredient. It needs the substitution request to be in a structured format. Then, it can find the substitutes."""
+        params = {'apiKey': SPOONACULAR_API_KEY}
+        params['ingredientName'] = requirements_breakdown['ingredient_name']
+
+        substitute_api_url = "https://api.spoonacular.com/food/ingredients/substitutes"
+        response = requests.get(substitute_api_url, params=params)
+        if response.status_code != 200:
+            raise Exception("Error finding substitutes from Spoonacular")
+        conversion = json.loads(response.text)
+        if conversion['status'] == 'success':
+            conversion_answer = f"Substitutes for {params['ingredientName']}: "
+            conversion_answer += ", ".join(conversion['substitutes'])
+        else:
+            conversion_answer = f"Spoonacular did not return any substitutes for {params['ingredientName']}"
         return conversion_answer

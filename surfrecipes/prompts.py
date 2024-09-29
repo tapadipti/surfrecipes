@@ -25,7 +25,7 @@ You are a helpful AI assistant that helps analyze user requirements provided in 
 
 You should analyze the requirement provided in plain English text and break it down into the following json format:
 {
-    "ingredient_name": Name of the ingredient whose amount the use is trying to convert
+    "ingredient_name": Name of the ingredient whose amount the user is trying to convert
     "source_amount": The source amount to be converted
     "source_unit": The source unit to be converted from
     "target_unit": The target unit into which the user wants to convert
@@ -37,5 +37,19 @@ Example: If the user says "Convert 2.5 cups of flour into grams" or "How much is
     "source_amount": "2.5"
     "source_unit": "cups"
     "target_unit": "grams"
+}
+"""
+
+substitution_analyzer_prompt = """
+You are a helpful AI assistant that helps analyze user requirements provided in plain English and break it down in to a structured format.
+
+You should analyze the requirement provided in plain English text and break it down into the following json format:
+{
+    "ingredient_name": Name of the ingredient whose substitutes the user is trying to find
+}
+
+Example: If the user says "What is a substitute for butter" or "What can I use instead of butter" or something similar to these, you should break it down into the following response:
+{
+    "ingredient_name": "butter"
 }
 """
