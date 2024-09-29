@@ -14,7 +14,7 @@ from rich.console import Console
 from taskara import Task
 from toolfuse import Tool, action, observation
 
-from .prompt_to_analyze_requirements import analyzer_prompt
+from .prompt_to_analyze_req import analyzer_prompt
 
 router = Router.from_env()
 console = Console()
@@ -31,18 +31,16 @@ class SurfRecipesTool(Tool):
     """A semantic desktop replaces click actions with semantic description rather than coordinates"""
 
     def __init__(
-        self, task: Task, desktop: Desktop, data_path: str = "./.data"
+        self, task: Task, data_path: str = "./.data"
     ) -> None:
         """
         Initialize and open a URL in the application.
 
         Args:
             task: Agent task. Defaults to None.
-            desktop: Desktop instance to wrap.
             data_path (str, optional): Path to data. Defaults to "./.data".
         """
-        super().__init__(wraps=desktop)
-        self.desktop = desktop
+        super().__init__()
 
         self.data_path = data_path
         self.img_path = os.path.join(self.data_path, "images", task.id)
@@ -98,6 +96,8 @@ class SurfRecipesTool(Tool):
 
         search_recipe_api_url = "https://api.spoonacular.com/recipes/complexSearch"
         response = requests.get(search_recipe_api_url, params=params)
+        if response.status_code != 200:
+            raise Exception("Error searching recipes on Spoonacular")
         recipe = json.loads(response.text)
         recipe_id = recipe['results'][0]['id']
         return recipe_id
@@ -110,6 +110,8 @@ class SurfRecipesTool(Tool):
         params = {'apiKey': SPOONACULAR_API_KEY}
         get_recipe_card_api_url = f"https://api.spoonacular.com/recipes/{recipe_id}/card"
         recipe_card_response = requests.get(get_recipe_card_api_url, params=params)
+        if recipe_card_response.status_code != 200:
+            raise Exception("Error getting recipe card from Spoonacular")
         recipe_card = json.loads(recipe_card_response.text)
         recipe_card_url = recipe_card['url']
         return recipe_card_url
@@ -117,6 +119,9 @@ class SurfRecipesTool(Tool):
     @observation
     def display_recipe_details(self, recipe_card_url: str) -> None:
         """Displays the details of a recipe using a recipe card available in the specified recipe_card_url."""
-        img = Image.open(requests.get(recipe_card_url, stream=True).raw)
+        img_content = requests.get(recipe_card_url, stream=True)
+        if img_content.status_code != 200:
+            raise Exception("Error loading recipe card image")
+        img = Image.open(img_content.raw)
         img.show()
         return "Task Complete"

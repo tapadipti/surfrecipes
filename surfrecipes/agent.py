@@ -9,7 +9,7 @@ from devicebay import Device
 from pydantic import BaseModel
 from rich.console import Console
 from rich.json import JSON
-from skillpacks.server.models import V1ActionSelection
+from skillpacks.server.models import V1ActionSelection, V1EnvState
 from surfkit.agent import TaskAgent
 from taskara import Task, TaskStatus
 from tenacity import before_sleep_log, retry, stop_after_attempt
@@ -17,7 +17,6 @@ from threadmem import RoleMessage, RoleThread
 from toolfuse.util import AgentUtils
 
 from .tool import SurfRecipesTool, router
-from .prompt_to_return_action import action_finder_prompt
 
 logging.basicConfig(level=logging.INFO)
 logger: Final = logging.getLogger(__name__)
@@ -43,7 +42,6 @@ class SurfRecipes(TaskAgent):
 
         Args:
             task (Task): Task to solve.
-            device (Device): Device to perform the task on.
             max_steps (int, optional): Max steps to try and solve. Defaults to 30.
 
         Returns:
@@ -58,43 +56,8 @@ class SurfRecipes(TaskAgent):
         task.ensure_thread("debug")
         task.post_message("assistant", f"I'll post debug messages here", thread="debug")
 
-        # # Check that the device we received is one we support
-        # if not isinstance(device, Desktop):
-        #     raise ValueError("Only desktop devices supported")
+        recipetool = SurfRecipesTool(task=task)
 
-        # # Wrap the standard desktop in our special tool
-        # semdesk = SemanticDesktop(task=task, desktop=device)
-        recipetool = SurfRecipesTool(task=task, desktop=device)
-
-        # # Add standard agent utils to the device
-        # semdesk.merge(AgentUtils())
-
-        # # Open a site if present in the parameters
-        # site = task._parameters.get("site") if task._parameters else None
-        # if site:
-        #     console.print(f"▶️ opening site url: {site}", style="blue")
-        #     task.post_message("assistant", f"opening site url {site}...")
-        #     semdesk.desktop.open_url(site)
-        #     console.print("waiting for browser to open...", style="blue")
-        #     time.sleep(5)
-
-        # # Get info about the desktop
-        # info = semdesk.desktop.info()
-        # screen_size = info["screen_size"]
-        # console.print(f"Screen size: {screen_size}")
-
-        # Get the json schema for the tools, excluding actions that aren't useful
-        # tools = semdesk.json_schema(
-        #     exclude_names=[
-        #         "move_mouse",
-        #         "click",
-        #         "drag_mouse",
-        #         "mouse_coordinates",
-        #         "take_screenshot",
-        #         "open_url",
-        #         "double_click",
-        #     ]
-        # )
         tools = recipetool.json_schema()
         console.print("tools: ", style="purple")
         console.print(JSON.from_data(tools))
@@ -104,14 +67,22 @@ class SurfRecipes(TaskAgent):
         thread.post(
             role="user",
             msg=(
-                f"{action_finder_prompt} "
-                f"Your current task is {task.description}, and your available tools are {tools}. "
+                "You are a helpful AI assistant that analyzes user requirements and find recipes that meet those requirements."
+                "You will receive details of a task and your job is to suggest what action should be taken next."
+                f"The actions available to you are {tools}."
+                "When you respond, always give a raw JSON adhering to the following schema and with the correct action called."
+                f"Schema: {V1ActionSelection.model_json_schema()}"
+                "If no further action is needed, return 'result' as the action_name."
+                "Let me know when you are ready and I'll send you the user requirement."
             ),
         )
+        console.print(f"thread messages: {thread.messages()}", style="blue")
         response = router.chat(thread, namespace="system")
         console.print(f"system prompt response: {response}", style="blue")
         thread.add_msg(response.msg)
-        current_state = response.msg
+
+        # The initial state is the task description itself.
+        current_state = task.description
 
         # Loop to run actions
         for i in range(max_steps):
@@ -174,7 +145,7 @@ class SurfRecipes(TaskAgent):
                 if task.status == TaskStatus.CANCELING:
                     task.status = TaskStatus.CANCELED
                     task.save()
-                return thread, True
+                return thread, current_state, True
 
             console.print("taking action...", style="white")
 
@@ -182,26 +153,10 @@ class SurfRecipes(TaskAgent):
             _thread = thread.copy()
             _thread.remove_images()
 
-            # # Take a screenshot of the desktop and post a message with it
-            # screenshot_b64 = semdesk.desktop.take_screenshot()
-            # task.post_message(
-            #     "assistant",
-            #     "current image",
-            #     images=[f"data:image/png;base64,{screenshot_b64}"],
-            #     thread="debug",
-            # )
-
-            # # Get the current mouse coordinates
-            # x, y = semdesk.desktop.mouse_coordinates()
-            # console.print(f"mouse coordinates: ({x}, {y})", style="white")
-
             # Craft the message asking the MLLM for an action
             msg = RoleMessage(
                 role="user",
-                text=(
-                    f"{action_finder_prompt} "
-                    f"Your current task is {current_state}, and your available tools are {recipetool.json_schema()}. "
-                ),
+                text=(f"Your current task is {current_state}. Please select an action from the provided schema."),
             )
             _thread.add_msg(msg)
 
@@ -209,13 +164,13 @@ class SurfRecipes(TaskAgent):
             response = router.chat(
                 _thread,
                 namespace="action",
-                # expect=V1ActionSelection,
+                expect=V1ActionSelection,
                 agent_id=self.name(),
             )
             task.add_prompt(response.prompt)
 
             try:
-                # Post to the user letting them know what the modle selected
+                # Post to the user letting them know what the model selected
                 selection = response.parsed
                 if not selection:
                     raise ValueError("No action selection parsed")
@@ -240,11 +195,11 @@ class SurfRecipes(TaskAgent):
                 console.print(JSON.from_data(selection.action.parameters))
                 task.post_message(
                     "assistant",
-                    f"✅ I think the task is done, please review the result: {selection.action.parameters['value']}",
+                    f"✅ I think the task is done, please review the result.",
                 )
-                task.status = TaskStatus.REVIEW
+                task.status = TaskStatus.FINISHED
                 task.save()
-                return _thread, True
+                return _thread, current_state, True
 
             # Find the selected action in the tool
             action = recipetool.find_action(selection.action.name)
@@ -267,6 +222,7 @@ class SurfRecipes(TaskAgent):
 
             # Record the action for feedback and tuning
             task.record_action(
+                state=V1EnvState(),
                 prompt=response.prompt,
                 action=selection.action,
                 tool=recipetool.ref(),
@@ -276,7 +232,9 @@ class SurfRecipes(TaskAgent):
             )
 
             _thread.add_msg(response.msg)
-            return _thread, False
+
+            new_state = action_response
+            return _thread, new_state, False
 
         except Exception as e:
             console.print("Exception taking action: ", e)
