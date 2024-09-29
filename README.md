@@ -6,9 +6,11 @@
     </p>
   <p align="center">
     An AI agent that understands your requirements and does the following:
-    - Searches recipes that meet your requirements
-    - Converts ingredient amounts from one unit to another
-    - Finds substitutes for your ingredients
+    <ul>
+      <li>Searches recipes that meet your requirements</li>
+      <li>Converts ingredient amounts from one unit to another</li>
+      <li>Finds substitutes for your ingredients</li>
+    </ul>
 </p>
 
 ## Install
@@ -24,7 +26,7 @@ The Reciper Surfer AI agent uses <a href="https://spoonacular.com/food-api">Spoo
 ```sh
 export SPOONACULAR_API_KEY=<Provide your SPOONACULAR API KEY here>
 ```
-If you have not created an account in Spoonacular, visit https://spoonacular.com/food-api to create an account and get your API key.
+If you have not created an account in Spoonacular, visit <a href="https://spoonacular.com/food-api">Spoonacular</a> to create an account and get your API key.
 
 Create a tracker
 
