@@ -151,7 +151,7 @@ class SurfRecipesTool(Tool):
 
     @action
     def convert_ingredient_amounts(self, requirements_breakdown: Dict[str, str]) -> None:
-        """Converts ingredients from one unit to another. It needs the conversion request to be in a structured format. Then, it can perform the conversion."""
+        """Converts ingredient amount from one unit to another. It needs the conversion request to be in a structured format. Then, it can perform the conversion."""
         params = {'apiKey': SPOONACULAR_API_KEY}
         params['ingredientName'] = requirements_breakdown['ingredient_name']
         params['sourceAmount'] = requirements_breakdown['source_amount']
@@ -185,7 +185,7 @@ class SurfRecipesTool(Tool):
         }
 
     @action
-    def convert_ingredient_amounts(self, requirements_breakdown: Dict[str, str]) -> None:
+    def get_ingredient_substitutes(self, requirements_breakdown: Dict[str, str]) -> None:
         """Find substitutes for a given ingredient. It needs the substitution request to be in a structured format. Then, it can find the substitutes."""
         params = {'apiKey': SPOONACULAR_API_KEY}
         params['ingredientName'] = requirements_breakdown['ingredient_name']
