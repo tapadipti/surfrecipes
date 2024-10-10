@@ -4,12 +4,14 @@ import time
 import traceback
 from typing import Final, List, Optional, Tuple, Type
 
-from agentdesk.device import Desktop
+# from agentdesk.device import Desktop
+from agentdesk.device_v1 import Desktop
 from devicebay import Device
 from pydantic import BaseModel
 from rich.console import Console
 from rich.json import JSON
 from skillpacks.server.models import V1ActionSelection, V1EnvState
+from skillpacks import EnvState
 from surfkit.agent import TaskAgent
 from taskara import Task, TaskStatus
 from tenacity import before_sleep_log, retry, stop_after_attempt
@@ -222,7 +224,8 @@ class SurfRecipes(TaskAgent):
 
             # Record the action for feedback and tuning
             task.record_action(
-                state=V1EnvState(),
+                # state=V1EnvState(),
+                state=EnvState(),
                 prompt=response.prompt,
                 action=selection.action,
                 tool=recipetool.ref(),
