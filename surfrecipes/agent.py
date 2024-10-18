@@ -4,7 +4,6 @@ import time
 import traceback
 from typing import Final, List, Optional, Tuple, Type
 
-# from agentdesk.device import Desktop
 from agentdesk.device_v1 import Desktop
 from devicebay import Device
 from pydantic import BaseModel
@@ -224,7 +223,6 @@ class SurfRecipes(TaskAgent):
 
             # Record the action for feedback and tuning
             task.record_action(
-                # state=V1EnvState(),
                 state=EnvState(),
                 prompt=response.prompt,
                 action=selection.action,
