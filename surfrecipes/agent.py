@@ -59,8 +59,6 @@ class SurfRecipes(TaskAgent):
         recipetool = SurfRecipesTool(task=task)
 
         tools = recipetool.json_schema()
-        console.print("tools: ", style="purple")
-        console.print(JSON.from_data(tools))
 
         # Create our thread and start with a system prompt
         thread = RoleThread()
