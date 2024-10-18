@@ -9,13 +9,12 @@ from devicebay import Device
 from pydantic import BaseModel
 from rich.console import Console
 from rich.json import JSON
-from skillpacks.server.models import V1ActionSelection, V1EnvState
+from skillpacks.server.models import V1ActionSelection
 from skillpacks import EnvState
 from surfkit.agent import TaskAgent
 from taskara import Task, TaskStatus
 from tenacity import before_sleep_log, retry, stop_after_attempt
 from threadmem import RoleMessage, RoleThread
-from toolfuse.util import AgentUtils
 
 from .tool import SurfRecipesTool, router
 
