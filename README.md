@@ -37,7 +37,7 @@ surfkit create tracker -n trk101 -r docker
 Create a device
 
 ```sh
-surfkit create device -n dev101 -p qemu
+surfkit create device -n dev101
 ```
 
 Create the agent
