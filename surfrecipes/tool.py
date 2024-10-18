@@ -1,15 +1,11 @@
-import hashlib
 import logging
 import os
-import time
 import json
-from typing import List, Optional, Tuple, Dict, Union
+from typing import List, Dict, Union
 
 import requests
-from agentdesk.device import Desktop
-from mllm import RoleMessage, RoleThread, Router
-from PIL import Image, ImageDraw
-from pydantic import BaseModel, Field
+from mllm import RoleThread, Router
+from PIL import Image
 from rich.console import Console
 from taskara import Task
 from toolfuse import Tool, action, observation
